@@ -1,0 +1,39 @@
+version: '3'
+services:
+    laravel.prod:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: laravel.prod
+        ports:
+            - 80:80
+        depends_on:
+            - db
+    # laravel.dev:
+    #     image: laravel:dev
+    #     ports:
+    #         - 80:80
+    #     volumes:
+    #         - '.\src:/src'
+    #     working_dir: /src/example-app
+    #     command: "php artisan serve --host=0.0.0.0 --port=80"
+    #     depends_on:
+    #         - db    
+    db:
+        container_name: db
+        image: mysql:latest
+        ports: 
+            - 3306:3306
+        environment:
+            MYSQL_DATABASE: laravel
+            # MYSQL_ROOT_PASSWORD: 1234 
+            MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        volumes:
+            # - mysql_data:/var/lib/mysql
+            - ./data:/var/lib/mysql # Podemos acceder al FS de mysql
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        depends_on: [db]
+        ports: [8080:80]
+
+
