@@ -1,4 +1,4 @@
-# CONTENERIXANDO LARAVEL
+# CONTENERIZANDO LARAVEL 9
 
 ## En desarrollo
 Objetivo crear un contenedor con todo lo necesario de laravel, pero el directorio de la aplicación que esté en local.
