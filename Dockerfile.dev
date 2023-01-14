@@ -1,0 +1,13 @@
+FROM laravel:dev
+ENV APP=example-app
+
+COPY \src /src
+RUN cd /src/$APP \
+    && npm install \
+    && composer install
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+COPY php.ini /etc/php/8.2/cli/conf.d/laravel.ini
+RUN chmod -R 775 /src/$APP/ \
+    && chown -R www-data:www-data /src/$APP/
+
+CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]

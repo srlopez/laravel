@@ -1,15 +1,17 @@
 # CONTENERIZANDO LARAVEL 9
 
 ## En desarrollo
-Objetivo crear un contenedor con todo lo necesario de laravel, pero el directorio de la aplicación que esté en local.
+Objetivo crear un contenedor con todo lo necesario del framework Laravel 9, que sirva par desarrollar una aplicación, con el directorio del código base en el host local.
+
+De esta manera mantenemos el host limpio de versiones y entornos de desarrollo que pueden ser utilizados ocasionalmente, podemos editar el código fuente con editores o IDEs desde el host, y utilizamos docker como una terminal de desarrollo con los comandos específicos del entorno.
 
 ### Creación de una IMAGEN con LARAVEL 9
-En el disrectorio local src contendrá el código de la aplicación. Ya que esta imagen quiero que sea independiente de cualquier aplicación. Y lanzamos un BASH desde la IMAGEN que queremos tomar de partida
+En el directorio local `src` contendrá el código de la aplicación. Ya que esta imagen quiero que sea independiente de cualquier aplicación, lanzamos una shell desde la IMAGEN BASE que queremos tomar de partida, en este caso un Ubuntu
 ```dos
 mkdir src
 docker run -it --rm --name laravel ubuntu
 ```
-En el container, instalamos todo lo necesario para que funcione Laravel (he tomado prestado parte de Laravel Sail)
+En el container, instalamos todo lo necesario para que funcione Laravel (he tomado prestado parte de los comandos de Laravel Sail)
 ```bash
 export DEBIAN_FRONTEND=noninteractive
 export TZ=Europe/Madrid
@@ -44,45 +46,48 @@ apt clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 composer --version
 ```
-En otra consola fiajmos la imagen y una vez hecho, entramos a crear una aplicación desde dentro
+En otra consola fijamos la imagen que nos va a servir de entorno de desarrollo, y una vez hecho, entramos a crear una aplicación laravel desde dentro:
 ```dos
 docker commit laravel laravel:dev
 docker stop laravel
 docker images -a
 docker run -it --rm -p 8000:8000 -v %CD%\src:/src -w /src laravel:dev bash
 ```
-En el nuevo container creamos y lanzamos la aplicación de ejemplo
+Ya tenemos una imagen "**laravel:dev**" para desarrollo.  
+En la nueva shell del container creamos y lanzamos la aplicación de ejemplo:
 ```bash
 composer create-project laravel/laravel example-app
 cd example-app
 php artisan serve --host 0.0.0.0 --port 8000
 ```
-`explorer http://localhost:8000` debería mostrar la página de Bienvenida
+Lanzando `explorer http://localhost:8000` debería mostrar la página de Bienvenida del framework.
 
-Para enlazar con BBDD, lanzamos mysql, y de nuevo el entorno laravel enlazado a la BBDD
+### Enlazar con MYSQL
+
+Ejecutamos los pasos conocidos de docker para lanzar `mysql`, y ponemos a correr el entorno laravel `link`ado a la BBDD:
 ```dos
 docker run -d --rm --name db -e MYSQL_DATABASE=laravel -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -v %CD%\data:/var/lib/mysql mysql
 docker run -d --rm --link db -v %CD%\src:/src -w /src laravel:dev bash
 ```
-Modificamos dentro del container lo minimo necesario para que la aplicación conecte (.env),  creamos unos datos (Users con Tinker) y los presentamos (welcome.blade.php y web.php)
-```bash 
+En nuestra aplicación modificamos **lo mínimo necesario** para que la aplicación conecte, DB_HOST en `.env`,  creamos unos datos (`Users` con comandos en Tinker), los presentamos en `welcome.blade.php`, y en `web.php` se los pasamos a la view. No necesitamos crear un controlador. 
+```bash
 cd example-app
+# DB_HOST
 sed -i 's/DB_HOST=127.0.0.1/DB_HOST=db/g' .env
 grep DB_HOST .env
-
+# Creación de datos aleatorios
 php artisan migrate 
 php artisan tinker --execute="User::factory()->count(9)->create();"
+# Paso de datos a la view
 sed -i "s@'welcome'@'welcome', array('users' => App\\\Models\\\User::all())@g" routes/web.php
 cat  routes/web.php
-
+# Creación de la view
 cat <<EOF >resources/views/welcome.blade.php
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
 <style>
-<style>
 table {   height: 100%;  }
-
 #center {
     font-family: "Lucida Console", "Lucida Sans Typewriter", monaco, "Bitstream Vera Sans Mono", monospace; font-size: 24px; font-style: normal; font-variant
 : normal; font-weight: 400; line-height: 23px;
@@ -91,21 +96,14 @@ table {   height: 100%;  }
   text-align: left; /*center;*/
   width: 800px; /*100%;*/
 }
-
 </style>
-    </head>
-    <body class="antialiased">
+</head>
+    <body>
     <table id=center>
-        <thead>
-        <th>Username</th>
-        <th>Email</th>
-        </thead>
+        <thead><th>Username</th><th>Email</th></thead>
         <tbody>
             @foreach(\$users as \$user)
-            <tr>
-            <td>{{\$user->name}} </td>
-            <td>{{\$user->email}} </td>
-            </tr>
+            <tr><td>{{\$user->name}}</td><td>{{\$user->email}}</td></tr>
             @endforeach
         </tbody>
     </table>
@@ -115,36 +113,41 @@ EOF
 cat resources/views/welcome.blade.php
 exit
 ```
-Una vez modificado todo, he preferido salir y lanzarlo desde comando
-```
+Una vez modificado todo, he preferido salir y mostrar cómo lanzarlo desde comando
+```dos
 docker run -it --rm -p 8000:8000 --link db -v %CD%\src:/src -w /src/example-app laravel:dev php artisan serve --host 0.0.0.0 --port 8000
 ```
 Con `explorer http://localhost:8000` debería mostrar los usuarios generados.
 
 ## En Producción
-Debemos poner un **servidor web** que exponga la aplicación.
-Tambien es conveniente generar una **imagen de la aplicación** y **componer todos los servicios** que vamos a usar
+El framework nos provee de un servidor web de desarrollo, en producción debemos poner un **servidor web** que exponga la aplicación.
+Tambien es conveniente generar una **imagen de la aplicación** para distribuirla adecuadamente, y para **componer todos los servicios** que vamos a usar en el `docker-compose.yml`
 ### APACHE
-Establecemos los permisos para que apache funcione.
+Establecemos los permisos para que apache funcione correctamente sobre la aplicación.
 ```dos
 docker run -it --rm -v %CD%\src:/src -w /src laravel:dev bash -c "chmod -R 775 example-app/ && chown -R www-data:www-data example-app/"
 ```
-y lanzamos la aplicación con el virtualhost que hemos configurado
+y lanzamos la aplicación vinculando el `virtualhost` que hemos configurado en `000-default.conf` en apache:
 ```
 docker run -d --rm -p 80:80 --link db -v %CD%\src:/src -v %CD%\000-default.conf:/etc/apache2/sites-available/000-default.conf:ro -w /src laravel:dev /usr/sbin/apache2ctl -D FOREGROUND
 ```
-Con `explorer http://localhost:8000` debería mostrar los usuarios generados.
+Con `explorer http://localhost:8000` debería mostrar los usuarios generados, y servido por Apache.
 
 ### IMAGEN
 En el `Dokerfile` se realizan los mismos pasos que hicimos para crear la imagen para desarrollo, y además copiamos la aplicación y las configuraciones que necesitamos.
-
-### COMPOSER
-O bien
-```dos
-docker build -t laravel.prod .
+```diff
+- Podríamos partir de la imagen de desarrollo "laravel:dev", y quedaría más conciso.
 ```
-o
+Creamos la imagen de producción:
+```dos
+docker build -t laravel:prod .
+docker build -t laravel:prod -f Dockerfile.dev .
+```
+### COMPOSE
+Tipico docker-compose.yml con los servicios.con las dos imagenes que trabajamos.
 ```
 docker compose build
-docker compose up
+docker compose up -d
+explorer http://localhost
 ```
+😉
