@@ -141,7 +141,7 @@ En el `Dokerfile` se realizan los mismos pasos que hicimos para crear la imagen 
 Creamos la imagen de producción:
 ```dos
 docker build -t laravel:prod .
-docker build -t laravel:prod -f Dockerfile.dev .
+docker build -t laravel:prod -f Dockerfile.prod .
 ```
 ### COMPOSE
 Tipico docker-compose.yml con los servicios.con las dos imagenes que trabajamos.
