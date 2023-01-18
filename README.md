@@ -67,7 +67,8 @@ Lanzando `explorer http://localhost:8000` debería mostrar la página de Bienven
 Ejecutamos los pasos conocidos de docker para lanzar `mysql`, y ponemos a correr el entorno laravel `link`ado a la BBDD:
 ```dos
 docker run -d --rm --name db -e MYSQL_DATABASE=laravel -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -v %CD%\data:/var/lib/mysql mysql
-docker run -d --rm --link db -v %CD%\src:/src -w /src laravel:dev bash
+docker run -it --rm --link db -v %CD%\src:/src -w /src laravel:dev bash
+docker ps 
 ```
 En nuestra aplicación modificamos **lo mínimo necesario** para que la aplicación conecte, DB_HOST en `.env`,  creamos unos datos (`Users` con comandos en Tinker), los presentamos en `welcome.blade.php`, y en `web.php` se los pasamos a la view. No necesitamos crear un controlador. 
 ```bash
@@ -79,8 +80,9 @@ grep DB_HOST .env
 php artisan migrate 
 php artisan tinker --execute="User::factory()->count(9)->create();"
 # Paso de datos a la view
+grep welcome routes/web.php
 sed -i "s@'welcome'@'welcome', array('users' => App\\\Models\\\User::all())@g" routes/web.php
-cat  routes/web.php
+grep welcome routes/web.php
 # Creación de la view
 cat <<EOF >resources/views/welcome.blade.php
 <!DOCTYPE html>
@@ -127,16 +129,47 @@ Establecemos los permisos para que apache funcione correctamente sobre la aplica
 ```dos
 docker run -it --rm -v %CD%\src:/src -w /src laravel:dev bash -c "chmod -R 775 example-app/ && chown -R www-data:www-data example-app/"
 ```
-y lanzamos la aplicación vinculando el `virtualhost` que hemos configurado en `000-default.conf` en apache:
+configuramos un `virtualhost` en el que vinculamos del directorio `DocumentRoot` con la parte `public` de nuestra aplicación, en un archivo que sustituirá la configuración por defecto:
 ```
+ServerName LaravelWeb
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /src/example-app/public
+    <Directory "/src/example-app/public">
+        AllowOverride All
+        Options Indexes FollowSymLinks MultiViews
+        Order Deny,Allow
+        Allow from all
+        Require all granted
+    </Directory> 
+</VirtualHost>
+``` 
+y lanzamos la aplicación vinculando el `virtualhost` que hemos configurado en `000-default.conf` en apache:
+
+```dos
 docker run -d --rm -p 80:80 --link db -v %CD%\src:/src -v %CD%\000-default.conf:/etc/apache2/sites-available/000-default.conf:ro -w /src laravel:dev /usr/sbin/apache2ctl -D FOREGROUND
 ```
 Con `explorer http://localhost:8000` debería mostrar los usuarios generados, y servido por Apache.
 
 ### IMAGEN
-En el `Dokerfile` se realizan los mismos pasos que hicimos para crear la imagen para desarrollo, y además copiamos la aplicación y las configuraciones que necesitamos.
+Para crear la imagen, creamos un `Dokerfile.prod` que parte de nuestra imagen de desarrollo, y además copiamos la aplicación, **las configuraciones que necesitamos**, la del `virtuialhost`, y `php.ini` en su lugar correspondiente, y como CMD lanzamos el servicio de `apache`:
+```
+FROM laravel:dev
+ENV APP=example-app
+
+COPY \src /src
+RUN cd /src/$APP \
+    && npm install \
+    && composer install
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+COPY php.ini /etc/php/8.2/cli/conf.d/laravel.ini
+RUN chmod -R 775 /src/$APP/ \
+    && chown -R www-data:www-data /src/$APP/
+
+CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
+```
 ```diff
-- Podríamos partir de la imagen de desarrollo "laravel:dev", y quedaría más conciso.
+- o podríamos incluir todos los comandos que aplicamos para la creación de la imagen para desarrollo, añadiendo éstos últimos.
 ```
 Creamos la imagen de producción:
 ```dos
@@ -144,10 +177,57 @@ docker build -t laravel:prod .
 docker build -t laravel:prod -f Dockerfile.prod .
 ```
 ### COMPOSE
-Tipico docker-compose.yml con los servicios.con las dos imagenes que trabajamos.
+Tipico `docker-compose.yml` con los servicios. Comentado aparece el servicios de laravel para desarrollo:
 ```
+version: '3'
+services:
+    laravel.prod:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: laravel.prod
+        ports:
+            - 80:80
+        depends_on:
+            - db
+    # laravel.dev:
+    #     image: laravel:dev
+    #     ports:
+    #         - 80:80
+    #     volumes:
+    #         - '.\src:/src'
+    #     working_dir: /src/example-app
+    #     command: "php artisan serve --host=0.0.0.0 --port=80"
+    #     depends_on:
+    #         - db    
+    db:
+        container_name: db
+        image: mysql:latest
+        ports: 
+            - 3306:3306
+        environment:
+            MYSQL_DATABASE: laravel
+            # MYSQL_ROOT_PASSWORD: 1234 
+            MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        volumes:
+            # - mysql_data:/var/lib/mysql
+            - ./data:/var/lib/mysql # Podemos acceder al FS de mysql
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        depends_on: [db]
+        ports: [8080:80]
+```
+y los lanzamos
+```dos
 docker compose build
 docker compose up -d
 explorer http://localhost
 ```
 😉
+
+FALTARÍA INDICAR COMO INICIALIZAR LA BASE DE DATOS
+en un directorio `dump` de volcado en el que hayamos copiado un backup de la BBDD en SQL, se puede inicializar la BBD con esos comandos de la siguiente manera en el servicio de Base de Datos.
+```
+        volumes:
+            - ./dump:/docker-entrypoint-initdb.d
+```
