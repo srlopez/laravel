@@ -157,6 +157,7 @@ Para crear la imagen, creamos un `Dokerfile.prod` que parte de nuestra imagen de
 FROM laravel:dev
 ENV APP=example-app
 
+# RUN git clone es una opción interesante cuando trabajamos en equipo
 COPY \src\$APP /src/$APP
 RUN cd /src/$APP \
     && npm install \
