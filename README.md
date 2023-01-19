@@ -157,7 +157,7 @@ Para crear la imagen, creamos un `Dokerfile.prod` que parte de nuestra imagen de
 FROM laravel:dev
 ENV APP=example-app
 
-COPY \src /src
+COPY \src\$APP /src/$APP
 RUN cd /src/$APP \
     && npm install \
     && composer install
@@ -210,8 +210,9 @@ services:
             # MYSQL_ROOT_PASSWORD: 1234 
             MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
         volumes:
-            # - mysql_data:/var/lib/mysql
-            - ./data:/var/lib/mysql # Podemos acceder al FS de mysql
+            - ./dump:/docker-entrypoint-initdb.d
+            - mysql_data:/var/lib/mysql
+            # - ./data:/var/lib/mysql # Podemos acceder al FS de mysql
     phpmyadmin:
         image: phpmyadmin/phpmyadmin
         depends_on: [db]
@@ -226,7 +227,8 @@ explorer http://localhost
 😉
 
 FALTARÍA INDICAR COMO INICIALIZAR LA BASE DE DATOS
-en un directorio `dump` de volcado en el que hayamos copiado un backup de la BBDD en SQL, se puede inicializar la BBD con esos comandos de la siguiente manera en el servicio de Base de Datos.
+En producción el archivo de base de datos debe ser un volumen en lugar de un bind.  
+En un directorio `dump` de volcado en el que hayamos copiado un backup de la BBDD en SQL, se puede inicializar la BBDD con esos comandos de la siguiente manera en el servicio de Base de Datos.
 ```
         volumes:
             - ./dump:/docker-entrypoint-initdb.d
