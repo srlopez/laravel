@@ -1,11 +1,28 @@
 # CONTENERIZANDO LARAVEL 9
 
-## En desarrollo
+# Indice de contenidos
+
+- [En desarrollo](#dev)
+  - [Creación de una imagen para desarrollo](#imgdev)
+  - [Enlace con la base de datos](#db)
+- [En producción](#prod)
+  - [Configuración de un servidor web](#apache)
+  - [Creación de la imagen de producción](#imgprod)
+  - [Composición](#composer)
+  - [Publicación](#registrro)
+
+
+<div id='id-section1'/>
+## Section 1
+<div id='id-section2'/>
+## Section 2
+
+## En desarrollo <a name="dev"></a>
 Objetivo crear un contenedor con todo lo necesario del framework Laravel 9, que sirva par desarrollar una aplicación, con el directorio del código base en el host local.
 
 De esta manera mantenemos el host limpio de versiones y entornos de desarrollo que pueden ser utilizados ocasionalmente, podemos editar el código fuente con editores o IDEs desde el host, y utilizamos docker como una terminal de desarrollo con los comandos específicos del entorno.
 
-### Creación de una IMAGEN con LARAVEL 9
+### Creación de una IMAGEN con LARAVEL 9 <a name="imgdev"></a>
 En el directorio local `src` contendrá el código de la aplicación. Ya que esta imagen quiero que sea independiente de cualquier aplicación, lanzamos una shell desde la IMAGEN BASE que queremos tomar de partida, en este caso un Ubuntu
 ```dos
 mkdir src
@@ -62,7 +79,7 @@ php artisan serve --host 0.0.0.0 --port 8000
 ```
 Lanzando `explorer http://localhost:8000` debería mostrar la página de Bienvenida del framework.
 
-### Enlazar con MYSQL
+### Enlazar con MYSQL <a name="db"></a>
 
 Ejecutamos los pasos conocidos de docker para lanzar `mysql`, y ponemos a correr el entorno laravel `link`ado a la BBDD:
 ```dos
@@ -121,10 +138,10 @@ docker run -it --rm -p 8000:8000 --link db -v %CD%\src:/src -w /src/example-app 
 ```
 Con `explorer http://localhost:8000` debería mostrar los usuarios generados.
 
-## En Producción
+## En Producción <a name="prod"></a>
 El framework nos provee de un servidor web de desarrollo, en producción debemos poner un **servidor web** que exponga la aplicación.
 Tambien es conveniente generar una **imagen de la aplicación** para distribuirla adecuadamente, y para **componer todos los servicios** que vamos a usar en el `docker-compose.yml`
-### APACHE
+### APACHE <a name="apache"></a>
 Establecemos los permisos para que apache funcione correctamente sobre la aplicación.
 ```dos
 docker run -it --rm -v %CD%\src:/src -w /src laravel:dev bash -c "chmod -R 775 example-app/ && chown -R www-data:www-data example-app/"
@@ -151,7 +168,7 @@ docker run -d --rm -p 80:80 --link db -v %CD%\src:/src -v %CD%\000-default.conf:
 ```
 Con `explorer http://localhost:8000` debería mostrar los usuarios generados, y servido por Apache.
 
-### IMAGEN
+### IMAGEN <a name="imgprod"></a>
 Para crear la imagen, creamos un `Dokerfile.prod` que parte de nuestra imagen de desarrollo, y además copiamos la aplicación, **las configuraciones que necesitamos**, la del `virtuialhost`, y `php.ini` en su lugar correspondiente, y como CMD lanzamos el servicio de `apache`:
 ```
 FROM laravel:dev
@@ -177,7 +194,7 @@ Creamos la imagen de producción:
 docker build -t laravel:prod .
 docker build -t laravel:prod -f Dockerfile.prod .
 ```
-### COMPOSE
+### COMPOSE <a name="composer"></a>
 Tipico `docker-compose.yml` con los servicios. Comentado aparece el servicios de laravel para desarrollo:
 ```
 version: '3'
@@ -233,4 +250,13 @@ En un directorio `dump` de volcado en el que hayamos copiado un backup de la BBD
 ```
         volumes:
             - ./dump:/docker-entrypoint-initdb.d
+```
+### PUBLICACIÓN <a name="reg"></a>
+
+Una vez creada la imagen, la podemos publicar en un Registro, en el que estemos identificados.
+Para ello ha de estar etiquetada con nuestro usuario.
+```dos
+docker login 
+docker tag laravel.prod:latest srlopez\laravel.api:1.0
+docker push srlopez\laravel.api:1.0
 ```
