@@ -9,7 +9,7 @@
   - [Configuración de un servidor web](#apache)
   - [Creación de la imagen de producción](#imgprod)
   - [Composición](#composer)
-  - [Publicación](#registrro)
+  - [Publicación](#registro)
 
 
 ## En desarrollo <a name="dev"></a> [↑](#home)
