@@ -251,7 +251,7 @@ En un directorio `dump` de volcado en el que hayamos copiado un backup de la BBD
         volumes:
             - ./dump:/docker-entrypoint-initdb.d
 ```
-### PUBLICACIÓN <a name="reg"></a>
+### PUBLICACIÓN <a name="registro"></a>
 
 Una vez creada la imagen, la podemos publicar en un Registro, en el que estemos identificados.
 Para ello ha de estar etiquetada con nuestro usuario.
